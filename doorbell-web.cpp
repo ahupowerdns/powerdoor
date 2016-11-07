@@ -1,6 +1,7 @@
 #include "crow.h"
 #include <string>
 #include <boost/asio.hpp>
+#include <syslog.h>
 
 using std::string;
 using std::cout;
@@ -26,6 +27,8 @@ int main(int argc, char**argv)
     boost::asio::io_service io_service;
         
     signal(SIGPIPE, SIG_IGN);
+    openlog("doorbell-web", LOG_NDELAY, LOG_AUTH);
+    
     
     CROW_ROUTE(app, "/")
     .methods("POST"_method)
@@ -43,6 +46,7 @@ int main(int argc, char**argv)
             size_t len = socket.read_some(boost::asio::buffer(buf), error);
             if (error != boost::asio::error::eof)
               return "some error";                        
+            syslog(LOG_WARNING, "IP %s had correct code, sent open command", get_header_value(req.headers, "x-real-ip").c_str());
             return "Welcome!";
           }
           catch(std::exception& e) {
@@ -50,6 +54,7 @@ int main(int argc, char**argv)
           }
         }
         else {
+          syslog(LOG_WARNING, "IP %s guessed code %s incorrectly", get_header_value(req.headers, "x-real-ip").c_str(), req.body.c_str());
           sleep(2);
           return "Wrong code!";
         }
